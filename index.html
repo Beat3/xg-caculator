@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预期进球数计算器 - xG Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #d1fae5 0%, #99f6e4 100%);
+            min-height: 100vh;
+            padding: 16px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #065f46;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .header p {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title .badge {
+            font-size: 12px;
+            background: #e5e7eb;
+            color: #4b5563;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: normal;
+        }
+        
+        .card-description {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .card-body {
+            padding: 16px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 12px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        
+        .result-box {
+            background: #ecfdf5;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        .result-box h4 {
+            font-size: 14px;
+            color: #065f46;
+            margin-bottom: 12px;
+        }
+        
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            text-align: center;
+        }
+        
+        .result-item p:first-child {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .result-item p:last-child {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .result-item.home p:last-child { color: #10b981; }
+        .result-item.away p:last-child { color: #14b8a6; }
+        .result-item.total p:last-child { color: #3b82f6; }
+        .result-item.diff p:last-child { color: #f59e0b; }
+        
+        .comparison-box {
+            background: #eff6ff;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        .comparison-box h4 {
+            font-size: 14px;
+            color: #1e40af;
+            margin-bottom: 12px;
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            text-align: center;
+        }
+        
+        .comparison-item p:first-child {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .comparison-item p:last-child {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .positive { color: #10b981; }
+        .negative { color: #ef4444; }
+        
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #059669;
+        }
+        
+        .btn-primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .btn-outline {
+            background: white;
+            border: 1px solid #d1d5db;
+            color: #374151;
+        }
+        
+        .btn-outline:hover {
+            background: #f3f4f6;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 16px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            color: #10b981;
+            border-bottom-color: #10b981;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .match-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .match-item {
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .match-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .match-item.selected {
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+        
+        .match-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .match-title {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .match-date {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .match-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .match-stats span {
+            font-weight: 500;
+            color: #1f2937;
+        }
+        
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 16px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+        
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 16px;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 24px;
+        }
+        
+        .search-btn {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        
+        .search-btn:hover {
+            background: #e5e7eb;
+        }
+        
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .info-text {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+        
+        @media (max-width: 480px) {
+            .result-grid, .comparison-grid, .match-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="4" y="2" width="16" height="20" rx="2"/>
+                    <line x1="8" y1="6" x2="16" y2="6"/>
+                    <line x1="8" y1="10" x2="16" y2="10"/>
+                    <line x1="8" y1="14" x2="12" y2="14"/>
+                </svg>
+                预期进球数计算器
+            </h1>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('calculator')">计算器</div>
+            <div class="tab" onclick="switchTab('history')">历史记录</div>
+            <div class="tab" onclick="switchTab('chart')">变化图表</div>
+        </div>
+
+        <!-- 计算器 -->
+        <div id="calculator-tab" class="tab-content active">
+            <!-- 比赛信息 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        比赛信息
+                        <span id="exist-badge" class="badge" style="display:none;">已存在</span>
+                    </div>
+                    <div class="card-description">输入比赛基本信息</div>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>联赛类型</label>
+                            <input type="text" id="leagueType" placeholder="例如：英超">
+                        </div>
+                        <div class="form-group">
+                            <label>主队名称</label>
+                            <input type="text" id="homeTeam" placeholder="例如：曼城">
+                        </div>
+                        <div class="form-group">
+                            <label>客队名称</label>
+                            <input type="text" id="awayTeam" placeholder="例如：利物浦">
+                        </div>
+                        <div class="form-group">
+                            <label>比赛日期</label>
+                            <input type="date" id="matchDate">
+                        </div>
+                    </div>
+                    <button class="search-btn" onclick="findExistingMatch()" id="searchBtn">
+                        🔍 查找已存在比赛
+                    </button>
+                </div>
+            </div>
+
+            <!-- 赔率输入 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">胜平负赔率</div>
+                    <div class="card-description">输入机构开出的胜平负赔率</div>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>主胜赔率</label>
+                            <input type="number" id="oddsHome" step="0.01" placeholder="2.10" oninput="calculateXG()">
+                        </div>
+                        <div class="form-group">
+                            <label>平局赔率</label>
+                            <input type="number" id="oddsDraw" step="0.01" placeholder="3.40" oninput="calculateXG()">
+                        </div>
+                        <div class="form-group">
+                            <label>客胜赔率</label>
+                            <input type="number" id="oddsAway" step="0.01" placeholder="3.60" oninput="calculateXG()">
+                        </div>
+                    </div>
+                    
+                    <div id="bookmakerResult" class="result-box" style="display:none;">
+                        <h4>机构预期进球数</h4>
+                        <div class="result-grid">
+                            <div class="result-item home">
+                                <p>主队xG</p>
+                                <p id="homeXG">-</p>
+                            </div>
+                            <div class="result-item away">
+                                <p>客队xG</p>
+                                <p id="awayXG">-</p>
+                            </div>
+                            <div class="result-item total">
+                                <p>总xG</p>
+                                <p id="totalXG">-</p>
+                            </div>
+                            <div class="result-item diff">
+                                <p>xG差值</p>
+                                <p id="xgDiff">-</p>
+                            </div>
+                        </div>
+                        <p class="info-text" id="fairOddsInfo"></p>
+                        
+                        <!-- 机构比分推荐 -->
+                        <div id="bookmakerScorePrediction" style="margin-top:16px; padding-top:16px; border-top:1px solid #d1fae5;">
+                            <h5 style="font-size:14px; color:#065f46; margin-bottom:12px;">📊 机构Top5比分推荐</h5>
+                            <div id="bookmakerScoreList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:8px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 公平xG输入 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">公平预期进球数</div>
+                    <div class="card-description">输入您认为的公平预期进球数</div>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>公平主队xG</label>
+                            <input type="number" id="fairHomeXG" step="0.01" placeholder="1.50" oninput="calculateFairXG()">
+                        </div>
+                        <div class="form-group">
+                            <label>公平客队xG</label>
+                            <input type="number" id="fairAwayXG" step="0.01" placeholder="1.20" oninput="calculateFairXG()">
+                        </div>
+                    </div>
+                    
+                    <div id="fairXGResult" class="result-box" style="display:none; margin-top:16px; background:#f0fdf4;">
+                        <h4 style="color:#166534;">公平预期进球数</h4>
+                        <div class="result-grid">
+                            <div class="result-item home">
+                                <p>主队xG</p>
+                                <p id="fairHomeXGDisplay">-</p>
+                            </div>
+                            <div class="result-item away">
+                                <p>客队xG</p>
+                                <p id="fairAwayXGDisplay">-</p>
+                            </div>
+                            <div class="result-item total">
+                                <p>总xG</p>
+                                <p id="fairTotalXGDisplay">-</p>
+                            </div>
+                            <div class="result-item diff">
+                                <p>xG差值</p>
+                                <p id="fairXGDiffDisplay">-</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 公平比分推荐 -->
+                        <div id="fairScorePrediction" style="margin-top:16px; padding-top:16px; border-top:1px solid #bbf7d0;">
+                            <h5 style="font-size:14px; color:#166534; margin-bottom:12px;">📊 公平Top5比分推荐</h5>
+                            <div id="fairScoreList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:8px;"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="comparisonResult" class="comparison-box" style="display:none;">
+                        <h4>差值比较分析</h4>
+                        <div class="comparison-grid">
+                            <div class="comparison-item">
+                                <p>主队xG差</p>
+                                <p id="homeXGDiff">-</p>
+                            </div>
+                            <div class="comparison-item">
+                                <p>客队xG差</p>
+                                <p id="awayXGDiff">-</p>
+                            </div>
+                            <div class="comparison-item">
+                                <p>总xG差</p>
+                                <p id="totalXGDiff">-</p>
+                            </div>
+                            <div class="comparison-item">
+                                <p>xG差值差</p>
+                                <p id="xgDiffDiff">-</p>
+                            </div>
+                        </div>
+                        <p class="info-text">💡 正值表示机构高估，负值表示机构低估</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 比赛结果输入 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">比赛结果</div>
+                    <div class="card-description">输入预测结果和实际比赛结果（可选）</div>
+                </div>
+                <div class="card-body">
+                    <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+                        <div class="form-group">
+                            <label>预测结果</label>
+                            <select id="predictionResult" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;">
+                                <option value="">请选择</option>
+                                <option value="主胜">主胜</option>
+                                <option value="平局">平局</option>
+                                <option value="客胜">客胜</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>预测比分</label>
+                            <input type="text" id="predictionScore" placeholder="例如：2-1">
+                        </div>
+                    </div>
+                    <div class="form-grid" style="grid-template-columns: repeat(2, 1fr); margin-top:12px;">
+                        <div class="form-group">
+                            <label>实际结果</label>
+                            <select id="actualResult" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;">
+                                <option value="">请选择</option>
+                                <option value="主胜">主胜</option>
+                                <option value="平局">平局</option>
+                                <option value="客胜">客胜</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>实际比分</label>
+                            <input type="text" id="actualScore" placeholder="例如：2-1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="btn-group">
+                <button class="btn btn-primary" id="saveBtn" onclick="saveMatch()">💾 保存比赛</button>
+                <button class="btn btn-outline" onclick="resetForm()">重置表单</button>
+                <button class="btn btn-danger" onclick="clearAll()">🗑️ 清空所有</button>
+            </div>
+        </div>
+
+        <!-- 历史记录 -->
+        <div id="history-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">已保存的比赛</div>
+                    <div class="card-description">点击查看比赛详情和变化记录</div>
+                </div>
+                <div class="card-body">
+                    <div style="margin-bottom:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                        <select id="filterLeague" onchange="renderMatchList()" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;">
+                            <option value="">全部联赛</option>
+                            <option value="英超">英超</option>
+                            <option value="西甲">西甲</option>
+                            <option value="德甲">德甲</option>
+                            <option value="意甲">意甲</option>
+                            <option value="法甲">法甲</option>
+                            <option value="中超">中超</option>
+                            <option value="日职联">日职联</option>
+                            <option value="韩K联">韩K联</option>
+                            <option value="澳超">澳超</option>
+                            <option value="美职联">美职联</option>
+                            <option value="欧冠">欧冠</option>
+                            <option value="欧联杯">欧联杯</option>
+                            <option value="亚冠">亚冠</option>
+                            <option value="世界杯">世界杯</option>
+                            <option value="欧洲杯">欧洲杯</option>
+                            <option value="亚洲杯">亚洲杯</option>
+                            <option value="其他">其他</option>
+                        </select>
+                        <button onclick="exportToExcel()" style="padding:8px 16px;background:#059669;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                            📊 导出Excel
+                        </button>
+                    </div>
+                    <div id="matchList" class="match-list">
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p>暂无保存的比赛记录</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 记录详情展示 -->
+            <div id="recordDetailCard" class="card" style="display:none; margin-top:16px;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span id="recordDetailTitle">比赛记录详情</span>
+                        <button class="btn-outline" style="padding:4px 12px; font-size:12px; margin-left:12px;" onclick="closeRecordDetail()">关闭</button>
+                    </div>
+                    <div class="card-description" id="recordDetailSubtitle">查看和删除历史记录</div>
+                </div>
+                <div class="card-body">
+                    <div id="recordDetailList" class="match-list">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 变化图表 -->
+        <div id="chart-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">预期进球数变化图</div>
+                    <div class="card-description" id="chartDescription">请先选择一场比赛</div>
+                </div>
+                <div class="card-body">
+                    <div id="chartEmpty" class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <p>请在历史记录中选择一场比赛查看变化图</p>
+                    </div>
+                    <div id="chartContainer" style="display:none;">
+                        <div class="chart-container">
+                            <canvas id="xgChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>数据存储于本地浏览器，清除浏览器数据将丢失所有记录</p>
+        </div>
+    </div>
+
+    <script>
+        // 数据存储
+        const STORAGE_KEY = 'xg_calculator_matches';
+        let matches = [];
+        let currentMatchId = null;
+        let chart = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMatches();
+            document.getElementById('matchDate').valueAsDate = new Date();
+            renderMatchList();
+        });
+
+        // 加载数据
+        function loadMatches() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                matches = data ? JSON.parse(data) : [];
+            } catch (e) {
+                matches = [];
+            }
+        }
+
+        // 保存数据
+        function saveMatches() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
+        }
+
+        // 泊松分布
+        function factorial(n) {
+            if (n <= 1) return 1;
+            let result = 1;
+            for (let i = 2; i <= n; i++) result *= i;
+            return result;
+        }
+
+        function poissonPMF(k, lambda) {
+            return Math.pow(lambda, k) * Math.exp(-lambda) / factorial(k);
+        }
+
+        // 计算胜平负概率
+        function calcHomeWinProb(lambdaHome, lambdaAway) {
+            let prob = 0;
+            for (let h = 1; h <= 10; h++) {
+                for (let a = 0; a < h; a++) {
+                    prob += poissonPMF(h, lambdaHome) * poissonPMF(a, lambdaAway);
+                }
+            }
+            return prob;
+        }
+
+        function calcDrawProb(lambdaHome, lambdaAway) {
+            let prob = 0;
+            for (let g = 0; g <= 10; g++) {
+                prob += poissonPMF(g, lambdaHome) * poissonPMF(g, lambdaAway);
+            }
+            return prob;
+        }
+
+        function calcAwayWinProb(lambdaHome, lambdaAway) {
+            let prob = 0;
+            for (let a = 1; a <= 10; a++) {
+                for (let h = 0; h < a; h++) {
+                    prob += poissonPMF(h, lambdaHome) * poissonPMF(a, lambdaAway);
+                }
+            }
+            return prob;
+        }
+
+        // 计算误差
+        function calcError(lambdaHome, lambdaAway, targetHome, targetDraw, targetAway) {
+            const homeWin = calcHomeWinProb(lambdaHome, lambdaAway);
+            const draw = calcDrawProb(lambdaHome, lambdaAway);
+            const awayWin = calcAwayWinProb(lambdaHome, lambdaAway);
+            return Math.pow(homeWin - targetHome, 2) + 
+                   Math.pow(draw - targetDraw, 2) + 
+                   Math.pow(awayWin - targetAway, 2);
+        }
+
+        // 从赔率反算xG
+        function calculateExpectedGoals(oddsHome, oddsDraw, oddsAway) {
+            const homeProb = 1 / oddsHome;
+            const drawProb = 1 / oddsDraw;
+            const awayProb = 1 / oddsAway;
+            const total = homeProb + drawProb + awayProb;
+            
+            const targetHome = homeProb / total;
+            const targetDraw = drawProb / total;
+            const targetAway = awayProb / total;
+
+            let lambdaHome = 1.5;
+            let lambdaAway = 1.0;
+            const lr = 0.01;
+            const eps = 0.0001;
+
+            for (let i = 0; i < 5000; i++) {
+                const err = calcError(lambdaHome, lambdaAway, targetHome, targetDraw, targetAway);
+                if (err < 0.00001) break;
+
+                const gradHome = (calcError(lambdaHome + eps, lambdaAway, targetHome, targetDraw, targetAway) - err) / eps;
+                const gradAway = (calcError(lambdaHome, lambdaAway + eps, targetHome, targetDraw, targetAway) - err) / eps;
+
+                lambdaHome -= lr * gradHome;
+                lambdaAway -= lr * gradAway;
+                lambdaHome = Math.max(0.1, lambdaHome);
+                lambdaAway = Math.max(0.1, lambdaAway);
+            }
+
+            return {
+                homeXG: Math.round(lambdaHome * 100) / 100,
+                awayXG: Math.round(lambdaAway * 100) / 100,
+                totalXG: Math.round((lambdaHome + lambdaAway) * 100) / 100,
+                xgDiff: Math.round((lambdaAway - lambdaHome) * 100) / 100,
+                margin: Math.round((total - 1) * 1000) / 10
+            };
+        }
+
+        // 计算并显示xG
+        function calculateXG() {
+            const oddsHome = parseFloat(document.getElementById('oddsHome').value);
+            const oddsDraw = parseFloat(document.getElementById('oddsDraw').value);
+            const oddsAway = parseFloat(document.getElementById('oddsAway').value);
+
+            if (!oddsHome || !oddsDraw || !oddsAway || oddsHome <= 0 || oddsDraw <= 0 || oddsAway <= 0) {
+                document.getElementById('bookmakerResult').style.display = 'none';
+                return;
+            }
+
+            const result = calculateExpectedGoals(oddsHome, oddsDraw, oddsAway);
+            
+            document.getElementById('homeXG').textContent = result.homeXG;
+            document.getElementById('awayXG').textContent = result.awayXG;
+            document.getElementById('totalXG').textContent = result.totalXG;
+            document.getElementById('xgDiff').textContent = (result.xgDiff >= 0 ? '+' : '') + result.xgDiff;
+            
+            const fairHome = Math.round((1 / (1/oddsHome / (1/oddsHome + 1/oddsDraw + 1/oddsAway))) * 100) / 100;
+            const fairDraw = Math.round((1 / (1/oddsDraw / (1/oddsHome + 1/oddsDraw + 1/oddsAway))) * 100) / 100;
+            const fairAway = Math.round((1 / (1/oddsAway / (1/oddsHome + 1/oddsDraw + 1/oddsAway))) * 100) / 100;
+            
+            document.getElementById('fairOddsInfo').textContent = 
+                `公平赔率: 主胜 ${fairHome} | 平局 ${fairDraw} | 客胜 ${fairAway} (抽水: ${result.margin}%)`;
+            
+            document.getElementById('bookmakerResult').style.display = 'block';
+            
+            // 显示机构比分推荐
+            displayScorePrediction('bookmakerScoreList', result.homeXG, result.awayXG);
+            
+            calculateFairXG();
+        }
+
+        // 计算Top5比分推荐
+        function calculateTopScores(lambdaHome, lambdaAway, topN = 5) {
+            const scores = [];
+            const maxGoals = 6;
+            
+            for (let home = 0; home <= maxGoals; home++) {
+                for (let away = 0; away <= maxGoals; away++) {
+                    const prob = poissonPMF(home, lambdaHome) * poissonPMF(away, lambdaAway);
+                    scores.push({
+                        score: `${home}-${away}`,
+                        home,
+                        away,
+                        prob: prob * 100,
+                        result: home > away ? '主胜' : home < away ? '客胜' : '平局'
+                    });
+                }
+            }
+            
+            // 按概率排序，取前topN
+            scores.sort((a, b) => b.prob - a.prob);
+            return scores.slice(0, topN);
+        }
+
+        // 显示比分推荐
+        function displayScorePrediction(elementId, homeXG, awayXG) {
+            const container = document.getElementById(elementId);
+            if (!container) return;
+            
+            const topScores = calculateTopScores(homeXG, awayXG, 5);
+            
+            container.innerHTML = topScores.map((item, index) => {
+                let bgColor = '#f3f4f6';
+                let textColor = '#374151';
+                if (item.result === '主胜') {
+                    bgColor = '#dcfce7';
+                    textColor = '#166534';
+                } else if (item.result === '客胜') {
+                    bgColor = '#fef3c7';
+                    textColor = '#92400e';
+                } else {
+                    bgColor = '#e0e7ff';
+                    textColor = '#3730a3';
+                }
+                
+                return `
+                    <div style="background:${bgColor}; padding:8px; border-radius:6px; text-align:center;">
+                        <div style="font-size:16px; font-weight:700; color:${textColor};">${item.score}</div>
+                        <div style="font-size:11px; color:#6b7280;">${item.prob.toFixed(1)}%</div>
+                        <div style="font-size:10px; color:#9ca3af;">${item.result}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 计算公平xG的总值和差值
+        function calculateFairXG() {
+            const fairHome = parseFloat(document.getElementById('fairHomeXG').value);
+            const fairAway = parseFloat(document.getElementById('fairAwayXG').value);
+
+            if (isNaN(fairHome) || isNaN(fairAway)) {
+                document.getElementById('fairXGResult').style.display = 'none';
+                document.getElementById('comparisonResult').style.display = 'none';
+                return;
+            }
+
+            const fairTotal = Math.round((fairHome + fairAway) * 100) / 100;
+            const fairDiff = Math.round((fairAway - fairHome) * 100) / 100;
+
+            document.getElementById('fairHomeXGDisplay').textContent = fairHome;
+            document.getElementById('fairAwayXGDisplay').textContent = fairAway;
+            document.getElementById('fairTotalXGDisplay').textContent = fairTotal;
+            document.getElementById('fairXGDiffDisplay').textContent = (fairDiff >= 0 ? '+' : '') + fairDiff;
+            document.getElementById('fairXGResult').style.display = 'block';
+            
+            // 显示公平比分推荐
+            displayScorePrediction('fairScoreList', fairHome, fairAway);
+
+            calculateComparison();
+        }
+
+        // 计算比较结果
+        function calculateComparison() {
+            const homeXGEl = document.getElementById('homeXG');
+            const awayXGEl = document.getElementById('awayXG');
+            
+            if (homeXGEl.textContent === '-') return;
+            
+            const bookmakerHome = parseFloat(homeXGEl.textContent);
+            const bookmakerAway = parseFloat(awayXGEl.textContent);
+            const fairHome = parseFloat(document.getElementById('fairHomeXG').value);
+            const fairAway = parseFloat(document.getElementById('fairAwayXG').value);
+
+            if (isNaN(fairHome) || isNaN(fairAway)) {
+                document.getElementById('comparisonResult').style.display = 'none';
+                return;
+            }
+
+            // 机构xG差值（客队-主队）
+            const bookmakerDiff = Math.round((bookmakerAway - bookmakerHome) * 100) / 100;
+            // 公平xG差值（客队-主队）
+            const fairDiff = Math.round((fairAway - fairHome) * 100) / 100;
+
+            const homeDiff = Math.round((bookmakerHome - fairHome) * 100) / 100;
+            const awayDiff = Math.round((bookmakerAway - fairAway) * 100) / 100;
+            const totalDiff = Math.round((bookmakerHome + bookmakerAway - fairHome - fairAway) * 100) / 100;
+            const diffDiff = Math.round((bookmakerDiff - fairDiff) * 100) / 100;
+
+            document.getElementById('homeXGDiff').textContent = (homeDiff >= 0 ? '+' : '') + homeDiff;
+            document.getElementById('homeXGDiff').className = homeDiff >= 0 ? 'positive' : 'negative';
+            
+            document.getElementById('awayXGDiff').textContent = (awayDiff >= 0 ? '+' : '') + awayDiff;
+            document.getElementById('awayXGDiff').className = awayDiff >= 0 ? 'positive' : 'negative';
+            
+            document.getElementById('totalXGDiff').textContent = (totalDiff >= 0 ? '+' : '') + totalDiff;
+            document.getElementById('totalXGDiff').className = totalDiff >= 0 ? 'positive' : 'negative';
+            
+            document.getElementById('xgDiffDiff').textContent = (diffDiff >= 0 ? '+' : '') + diffDiff;
+            document.getElementById('xgDiffDiff').className = diffDiff >= 0 ? 'positive' : 'negative';
+
+            document.getElementById('comparisonResult').style.display = 'block';
+        }
+
+        // 切换标签
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            document.querySelector(`.tab:nth-child(${tab === 'calculator' ? 1 : tab === 'history' ? 2 : 3})`).classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+        }
+
+        // 查找已存在比赛
+        function findExistingMatch() {
+            const homeTeam = document.getElementById('homeTeam').value.trim();
+            const awayTeam = document.getElementById('awayTeam').value.trim();
+            const matchDate = document.getElementById('matchDate').value;
+
+            if (!homeTeam || !awayTeam) {
+                alert('请输入主队和客队名称');
+                return;
+            }
+
+            const existing = matches.find(m => 
+                m.homeTeam === homeTeam && 
+                m.awayTeam === awayTeam && 
+                m.date === matchDate
+            );
+
+            if (existing) {
+                currentMatchId = existing.id;
+                document.getElementById('exist-badge').style.display = 'inline';
+                document.getElementById('leagueType').value = existing.leagueType || '';
+                document.getElementById('oddsHome').value = existing.oddsHome;
+                document.getElementById('oddsDraw').value = existing.oddsDraw;
+                document.getElementById('oddsAway').value = existing.oddsAway;
+                document.getElementById('fairHomeXG').value = existing.fairHomeXG;
+                document.getElementById('fairAwayXG').value = existing.fairAwayXG;
+                document.getElementById('predictionResult').value = existing.predictionResult || '';
+                document.getElementById('predictionScore').value = existing.predictionScore || '';
+                document.getElementById('actualResult').value = existing.actualResult || '';
+                document.getElementById('actualScore').value = existing.actualScore || '';
+                calculateXG();
+                alert('已找到并加载该比赛数据！');
+            } else {
+                alert('未找到该比赛，将作为新比赛保存');
+            }
+        }
+
+        // 生成ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // 检查数据是否相同
+        function isDataSame(oldData, newData) {
+            return oldData.oddsHome === newData.oddsHome &&
+                   oldData.oddsDraw === newData.oddsDraw &&
+                   oldData.oddsAway === newData.oddsAway &&
+                   oldData.fairHomeXG === newData.fairHomeXG &&
+                   oldData.fairAwayXG === newData.fairAwayXG;
+        }
+
+        // 保存比赛
+        function saveMatch() {
+            const leagueType = document.getElementById('leagueType').value;
+            const homeTeam = document.getElementById('homeTeam').value.trim();
+            const awayTeam = document.getElementById('awayTeam').value.trim();
+            const matchDate = document.getElementById('matchDate').value;
+            const oddsHome = parseFloat(document.getElementById('oddsHome').value);
+            const oddsDraw = parseFloat(document.getElementById('oddsDraw').value);
+            const oddsAway = parseFloat(document.getElementById('oddsAway').value);
+            const fairHomeXG = parseFloat(document.getElementById('fairHomeXG').value) || 0;
+            const fairAwayXG = parseFloat(document.getElementById('fairAwayXG').value) || 0;
+            const predictionResult = document.getElementById('predictionResult').value;
+            const predictionScore = document.getElementById('predictionScore').value.trim();
+            const actualResult = document.getElementById('actualResult').value;
+            const actualScore = document.getElementById('actualScore').value.trim();
+
+            if (!homeTeam || !awayTeam || !oddsHome || !oddsDraw || !oddsAway) {
+                alert('请填写完整的比赛信息和赔率');
+                return;
+            }
+
+            const result = calculateExpectedGoals(oddsHome, oddsDraw, oddsAway);
+            
+            // 公平xG差值（客队-主队）
+            const fairDiff = Math.round((fairAwayXG - fairHomeXG) * 100) / 100;
+            
+            const matchData = {
+                leagueType,
+                oddsHome, oddsDraw, oddsAway,
+                bookmakerHomeXG: result.homeXG,
+                bookmakerAwayXG: result.awayXG,
+                bookmakerTotalXG: result.totalXG,
+                bookmakerXGDiff: result.xgDiff,
+                fairHomeXG,
+                fairAwayXG,
+                fairTotalXG: Math.round((fairHomeXG + fairAwayXG) * 100) / 100,
+                fairXGDiff: fairDiff,
+                predictionResult,
+                predictionScore,
+                actualResult,
+                actualScore,
+                comparison: {
+                    homeXGDiff: Math.round((result.homeXG - fairHomeXG) * 100) / 100,
+                    awayXGDiff: Math.round((result.awayXG - fairAwayXG) * 100) / 100,
+                    totalXGDiff: Math.round((result.totalXG - fairHomeXG - fairAwayXG) * 100) / 100,
+                    xgDiffDiff: Math.round((result.xgDiff - fairDiff) * 100) / 100
+                }
+            };
+
+            // 检查是否与当前数据相同
+            if (currentMatchId) {
+                const match = matches.find(m => m.id === currentMatchId);
+                if (match && isDataSame(match, matchData)) {
+                    if (!confirm('新记录与当前数据完全相同，确定要保存吗？')) {
+                        return;
+                    }
+                }
+            }
+
+            if (currentMatchId) {
+                // 更新现有比赛
+                const match = matches.find(m => m.id === currentMatchId);
+                if (match) {
+                    const record = {
+                        id: generateId(),
+                        timestamp: new Date().toISOString(),
+                        ...matchData
+                    };
+                    match.records.push(record);
+                    Object.assign(match, matchData);
+                    match.updatedAt = new Date().toISOString();
+                }
+            } else {
+                // 检查是否已存在
+                const existing = matches.find(m => 
+                    m.homeTeam === homeTeam && 
+                    m.awayTeam === awayTeam && 
+                    m.date === matchDate
+                );
+
+                if (existing) {
+                    currentMatchId = existing.id;
+                    const record = {
+                        id: generateId(),
+                        timestamp: new Date().toISOString(),
+                        ...matchData
+                    };
+                    existing.records.push(record);
+                    Object.assign(existing, matchData);
+                    existing.updatedAt = new Date().toISOString();
+                } else {
+                    // 创建新比赛
+                    const newMatch = {
+                        id: generateId(),
+                        homeTeam,
+                        awayTeam,
+                        date: matchDate,
+                        ...matchData,
+                        records: [],
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    };
+                    matches.push(newMatch);
+                    currentMatchId = newMatch.id;
+                }
+            }
+
+            saveMatches();
+            renderMatchList();
+            document.getElementById('exist-badge').style.display = 'inline';
+            alert('保存成功！');
+        }
+
+        // 重置表单
+        function resetForm() {
+            document.getElementById('leagueType').value = '';
+            document.getElementById('homeTeam').value = '';
+            document.getElementById('awayTeam').value = '';
+            document.getElementById('matchDate').valueAsDate = new Date();
+            document.getElementById('oddsHome').value = '';
+            document.getElementById('oddsDraw').value = '';
+            document.getElementById('oddsAway').value = '';
+            document.getElementById('fairHomeXG').value = '';
+            document.getElementById('fairAwayXG').value = '';
+            document.getElementById('predictionResult').value = '';
+            document.getElementById('predictionScore').value = '';
+            document.getElementById('actualResult').value = '';
+            document.getElementById('actualScore').value = '';
+            document.getElementById('bookmakerResult').style.display = 'none';
+            document.getElementById('fairXGResult').style.display = 'none';
+            document.getElementById('comparisonResult').style.display = 'none';
+            document.getElementById('exist-badge').style.display = 'none';
+            currentMatchId = null;
+        }
+
+        // 清空所有
+        function clearAll() {
+            if (confirm('确定要清空所有比赛数据吗？此操作不可恢复！')) {
+                matches = [];
+                saveMatches();
+                renderMatchList();
+                resetForm();
+                alert('已清空所有数据');
+            }
+        }
+
+        // 渲染比赛列表
+        function renderMatchList() {
+            const container = document.getElementById('matchList');
+            const filterLeague = document.getElementById('filterLeague') ? document.getElementById('filterLeague').value : '';
+            
+            let filteredMatches = matches;
+            if (filterLeague) {
+                filteredMatches = matches.filter(m => m.leagueType === filterLeague);
+            }
+            
+            if (filteredMatches.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p>${filterLeague ? '该联赛暂无比赛记录' : '暂无保存的比赛记录'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filteredMatches.map(match => `
+                <div class="match-item ${currentMatchId === match.id ? 'selected' : ''}" onclick="selectMatch('${match.id}')">
+                    <div class="match-header">
+                        <div>
+                            <div class="match-title">${match.homeTeam} vs ${match.awayTeam}</div>
+                            <div class="match-date">${match.leagueType ? match.leagueType + ' · ' : ''}${match.date} · ${match.records.length} 条记录</div>
+                        </div>
+                        <button class="delete-btn" onclick="deleteMatch('${match.id}', event)">🗑️</button>
+                    </div>
+                    <div class="match-stats">
+                        <div>机构主xG: <span>${match.bookmakerHomeXG}</span></div>
+                        <div>机构客xG: <span>${match.bookmakerAwayXG}</span></div>
+                        <div>公平主xG: <span>${match.fairHomeXG}</span></div>
+                        <div>公平客xG: <span>${match.fairAwayXG}</span></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 选择比赛
+        function selectMatch(id) {
+            const match = matches.find(m => m.id === id);
+            if (!match) return;
+
+            currentMatchId = id;
+            document.getElementById('leagueType').value = match.leagueType || '';
+            document.getElementById('homeTeam').value = match.homeTeam;
+            document.getElementById('awayTeam').value = match.awayTeam;
+            document.getElementById('matchDate').value = match.date;
+            document.getElementById('oddsHome').value = match.oddsHome;
+            document.getElementById('oddsDraw').value = match.oddsDraw;
+            document.getElementById('oddsAway').value = match.oddsAway;
+            document.getElementById('fairHomeXG').value = match.fairHomeXG;
+            document.getElementById('fairAwayXG').value = match.fairAwayXG;
+            document.getElementById('predictionResult').value = match.predictionResult || '';
+            document.getElementById('predictionScore').value = match.predictionScore || '';
+            document.getElementById('actualResult').value = match.actualResult || '';
+            document.getElementById('actualScore').value = match.actualScore || '';
+            document.getElementById('exist-badge').style.display = 'inline';
+            
+            calculateXG();
+            renderMatchList();
+            renderChart();
+            
+            // 在历史记录页面显示记录详情
+            showRecordDetail(id);
+        }
+
+        // 显示记录详情
+        function showRecordDetail(matchId) {
+            const match = matches.find(m => m.id === matchId);
+            if (!match) return;
+
+            document.getElementById('recordDetailTitle').textContent = 
+                `${match.homeTeam} vs ${match.awayTeam} 记录详情`;
+            document.getElementById('recordDetailSubtitle').textContent = 
+                `${match.leagueType ? match.leagueType + ' · ' : ''}${match.date} · 共 ${match.records.length + 1} 条记录`;
+
+            const container = document.getElementById('recordDetailList');
+            
+            // 生成命中提示
+            function getHitStatus(pred, actual) {
+                if (!pred || !actual) return '';
+                if (pred === actual) {
+                    return '<span style="color:#dc2626; font-weight:700; margin-left:8px;">✓ 中</span>';
+                } else {
+                    return '<span style="color:#374151; font-weight:700; margin-left:8px;">✗ 不中</span>';
+                }
+            }
+            
+            // 显示初始记录
+            let html = `
+                <div class="match-item" style="background:#f0fdf4; border-color:#86efac;">
+                    <div class="match-header">
+                        <div>
+                            <div class="match-title" style="color:#166534;">📌 初始记录</div>
+                            <div class="match-date">${new Date(match.createdAt).toLocaleString('zh-CN')}</div>
+                        </div>
+                    </div>
+                    <div class="match-stats" style="grid-template-columns: repeat(4, 1fr);">
+                        <div>赔率: <span>${match.oddsHome}/${match.oddsDraw}/${match.oddsAway}</span></div>
+                        <div>机构xG: <span>${match.bookmakerHomeXG} - ${match.bookmakerAwayXG}</span></div>
+                        <div>公平xG: <span>${match.fairHomeXG} - ${match.fairAwayXG}</span></div>
+                        <div>总xG: <span>${match.bookmakerTotalXG} / ${match.fairTotalXG}</span></div>
+                    </div>
+                    ${match.predictionResult || match.actualResult ? `
+                    <div class="match-stats" style="grid-template-columns: repeat(3, 1fr); margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db;">
+                        <div>预测: <span>${match.predictionResult || '-'} ${match.predictionScore || ''}</span></div>
+                        <div>实际: <span>${match.actualResult || '-'} ${match.actualScore || ''}</span></div>
+                        <div>${getHitStatus(match.predictionResult, match.actualResult)}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // 显示所有历史记录
+            match.records.forEach((record, index) => {
+                html += `
+                    <div class="match-item">
+                        <div class="match-header">
+                            <div>
+                                <div class="match-title">📝 记录 ${index + 1}</div>
+                                <div class="match-date">${new Date(record.timestamp).toLocaleString('zh-CN')}</div>
+                            </div>
+                            <button class="delete-btn" onclick="deleteRecord('${matchId}', '${record.id}', event)" title="删除此记录">🗑️</button>
+                        </div>
+                        <div class="match-stats" style="grid-template-columns: repeat(4, 1fr);">
+                            <div>赔率: <span>${record.oddsHome}/${record.oddsDraw}/${record.oddsAway}</span></div>
+                            <div>机构xG: <span>${record.bookmakerHomeXG} - ${record.bookmakerAwayXG}</span></div>
+                            <div>公平xG: <span>${record.fairHomeXG} - ${record.fairAwayXG}</span></div>
+                            <div>总xG: <span>${record.bookmakerTotalXG} / ${record.fairTotalXG}</span></div>
+                        </div>
+                        ${record.predictionResult || record.actualResult ? `
+                        <div class="match-stats" style="grid-template-columns: repeat(3, 1fr); margin-top:8px; padding-top:8px; border-top:1px dashed #e5e7eb;">
+                            <div>预测: <span>${record.predictionResult || '-'} ${record.predictionScore || ''}</span></div>
+                            <div>实际: <span>${record.actualResult || '-'} ${record.actualScore || ''}</span></div>
+                            <div>${getHitStatus(record.predictionResult, record.actualResult)}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            document.getElementById('recordDetailCard').style.display = 'block';
+        }
+
+        // 关闭记录详情
+        function closeRecordDetail() {
+            document.getElementById('recordDetailCard').style.display = 'none';
+        }
+
+        // 删除单条记录
+        function deleteRecord(matchId, recordId, event) {
+            event.stopPropagation();
+            if (!confirm('确定要删除这条记录吗？')) return;
+
+            const match = matches.find(m => m.id === matchId);
+            if (!match) return;
+
+            match.records = match.records.filter(r => r.id !== recordId);
+            match.updatedAt = new Date().toISOString();
+            
+            saveMatches();
+            showRecordDetail(matchId);
+            renderMatchList();
+            alert('记录已删除');
+        }
+
+        // 删除比赛
+        function deleteMatch(id, event) {
+            event.stopPropagation();
+            if (confirm('确定要删除这场比赛吗？这将删除所有相关记录！')) {
+                matches = matches.filter(m => m.id !== id);
+                saveMatches();
+                if (currentMatchId === id) {
+                    resetForm();
+                    closeRecordDetail();
+                }
+                renderMatchList();
+            }
+        }
+
+        // 导出Excel
+        function exportToExcel() {
+            if (matches.length === 0) {
+                alert('没有数据可导出');
+                return;
+            }
+
+            // 准备数据 - 只导出每场比赛的最新记录
+            const exportData = [];
+            
+            matches.forEach(match => {
+                const hitStatus = (match.predictionResult && match.actualResult) 
+                    ? (match.predictionResult === match.actualResult ? '中' : '不中') 
+                    : '';
+                
+                exportData.push({
+                    '比赛日期': match.date,
+                    '联赛': match.leagueType || '',
+                    '主队': match.homeTeam,
+                    '客队': match.awayTeam,
+                    '更新时间': new Date(match.updatedAt || match.createdAt).toLocaleString('zh-CN'),
+                    '主胜赔率': match.oddsHome,
+                    '平局赔率': match.oddsDraw,
+                    '客胜赔率': match.oddsAway,
+                    '机构主xG': match.bookmakerHomeXG,
+                    '机构客xG': match.bookmakerAwayXG,
+                    '机构总xG': match.bookmakerTotalXG,
+                    '机构xG差值': match.bookmakerXGDiff,
+                    '公平主xG': match.fairHomeXG,
+                    '公平客xG': match.fairAwayXG,
+                    '公平总xG': match.fairTotalXG,
+                    '公平xG差值': match.fairXGDiff,
+                    '主队xG差': match.comparison?.homeXGDiff || '',
+                    '客队xG差': match.comparison?.awayXGDiff || '',
+                    '总xG差': match.comparison?.totalXGDiff || '',
+                    'xG差值差': match.comparison?.xgDiffDiff || '',
+                    '预测结果': match.predictionResult || '',
+                    '预测比分': match.predictionScore || '',
+                    '实际结果': match.actualResult || '',
+                    '实际比分': match.actualScore || '',
+                    '命中': hitStatus
+                });
+            });
+
+            // 创建工作簿
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+
+            // 设置列宽
+            ws['!cols'] = [
+                { wch: 12 }, // 比赛日期
+                { wch: 10 }, // 联赛
+                { wch: 15 }, // 主队
+                { wch: 15 }, // 客队
+                { wch: 20 }, // 更新时间
+                { wch: 10 }, // 主胜赔率
+                { wch: 10 }, // 平局赔率
+                { wch: 10 }, // 客胜赔率
+                { wch: 10 }, // 机构主xG
+                { wch: 10 }, // 机构客xG
+                { wch: 10 }, // 机构总xG
+                { wch: 10 }, // 机构xG差值
+                { wch: 10 }, // 公平主xG
+                { wch: 10 }, // 公平客xG
+                { wch: 10 }, // 公平总xG
+                { wch: 10 }, // 公平xG差值
+                { wch: 10 }, // 主队xG差
+                { wch: 10 }, // 客队xG差
+                { wch: 10 }, // 总xG差
+                { wch: 10 }, // xG差值差
+                { wch: 10 }, // 预测结果
+                { wch: 10 }, // 预测比分
+                { wch: 10 }, // 实际结果
+                { wch: 10 }, // 实际比分
+                { wch: 8 }   // 命中
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, '比赛记录');
+
+            // 生成文件名
+            const now = new Date();
+            const fileName = `xG比赛记录_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}.xlsx`;
+
+            // 下载文件
+            XLSX.writeFile(wb, fileName);
+        }
+
+        // 渲染图表
+        function renderChart() {
+            const match = matches.find(m => m.id === currentMatchId);
+            
+            if (!match) {
+                document.getElementById('chartEmpty').style.display = 'block';
+                document.getElementById('chartContainer').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('chartDescription').textContent = 
+                `${match.homeTeam} vs ${match.awayTeam} 的xG变化趋势`;
+
+            if (match.records.length === 0) {
+                document.getElementById('chartEmpty').innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <p>该比赛暂无变化记录</p>
+                    <p style="font-size:12px;margin-top:8px;">更新比赛数据后会自动记录变化</p>
+                `;
+                document.getElementById('chartEmpty').style.display = 'block';
+                document.getElementById('chartContainer').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('chartEmpty').style.display = 'none';
+            document.getElementById('chartContainer').style.display = 'block';
+
+            const labels = ['初始', ...match.records.map((_, i) => `记录${i + 1}`)];
+            const data = [
+                {
+                    bookmakerHomeXG: match.bookmakerHomeXG,
+                    bookmakerAwayXG: match.bookmakerAwayXG,
+                    bookmakerTotalXG: match.bookmakerTotalXG,
+                    bookmakerXGDiff: match.bookmakerXGDiff,
+                    fairHomeXG: match.fairHomeXG,
+                    fairAwayXG: match.fairAwayXG,
+                    fairTotalXG: match.fairTotalXG,
+                    fairXGDiff: match.fairXGDiff
+                },
+                ...match.records.map(r => ({
+                    bookmakerHomeXG: r.bookmakerHomeXG,
+                    bookmakerAwayXG: r.bookmakerAwayXG,
+                    bookmakerTotalXG: r.bookmakerTotalXG,
+                    bookmakerXGDiff: r.bookmakerXGDiff,
+                    fairHomeXG: r.fairHomeXG,
+                    fairAwayXG: r.fairAwayXG,
+                    fairTotalXG: r.fairTotalXG,
+                    fairXGDiff: r.fairXGDiff
+                }))
+            ];
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            const ctx = document.getElementById('xgChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: '机构主队xG',
+                            data: data.map(d => d.bookmakerHomeXG),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '机构客队xG',
+                            data: data.map(d => d.bookmakerAwayXG),
+                            borderColor: '#14b8a6',
+                            backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '公平主队xG',
+                            data: data.map(d => d.fairHomeXG),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '公平客队xG',
+                            data: data.map(d => d.fairAwayXG),
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '机构总xG',
+                            data: data.map(d => d.bookmakerTotalXG),
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '公平总xG',
+                            data: data.map(d => d.fairTotalXG),
+                            borderColor: '#eab308',
+                            backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '机构xG差值',
+                            data: data.map(d => d.bookmakerXGDiff),
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '公平xG差值',
+                            data: data.map(d => d.fairXGDiff),
+                            borderColor: '#dc2626',
+                            backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
